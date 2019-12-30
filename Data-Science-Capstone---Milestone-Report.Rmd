@@ -1,0 +1,106 @@
+---
+title: "Data Science Capstone - Milestone Report"
+author: "Ioannis Labrakis"
+date: "16 December 2019"
+output: 
+  html_document: 
+    fig_width: 18
+---
+
+#Understanding the Problem
+This report aims to interpret the data provided by the Coursera Data Science Capstone Course https://d396qusza40orc.cloudfront.net/dsscapstone/dataset/Coursera-SwiftKey.zip. It will provide the first steps of the final analysis, which contain the loading and exploratory research of the data. 
+
+The final project will involve a text predicting model. This model should be able to predict the next probable word wanted by the user.
+
+#Getting and Cleaning the Data
+Having the data downloaded, it can be seen that they contain text for different languages, like Russian, Finnish, German and English. In this analysis only the English text will be used, located in the "en_US" folder.
+
+The data were imported into r, after they have been downloaded.
+```{r, echo = TRUE,warning=FALSE, cache= TRUE}
+news <- readLines("en_US.news.txt",encoding="UTF-8",skipNul = TRUE)
+twitter <- readLines("en_US.twitter.txt",encoding="UTF-8",skipNul = TRUE)
+blogs <- readLines("en_US.blogs.txt",encoding="UTF-8",skipNul = TRUE)
+```
+
+The data structure were examined and summarized. 
+```{r, echo=TRUE, warning=FALSE, ,message=FALSE, cache= TRUE}
+library(stringr)
+#file size
+news_size <- file.info("en_US.news.txt")$size
+twitter_size <- file.info("en_US.twitter.txt")$size
+blogs_size <- file.info("en_US.blogs.txt")$size
+#function to count words
+words_count <- function(x){sum(str_count(x,"\\S+"))}
+#summary
+df <- data.frame(file = c("news","twitter","blogs"),lines = NA, words = NA, size = NA)
+text <- list(news = news, twitter = twitter, blogs = blogs)
+df$lines <- sapply(text, length)
+df$words <- sapply(text, words_count)
+df$size <- list(news = news_size, twitter = twitter_size, blogs = blogs_size)
+df
+
+```
+
+For investigating further the files they needed to be cleaned. Because of their size, a sample of each was taken. The amount of sample taken from each, was 1% of the data.
+```{r, echo = TRUE, warning = FALSE, ,message=FALSE, cache= TRUE}
+#sampling
+set.seed(101)
+news_sample <- sample(news, length(news)*0.01, replace = FALSE)
+twitter_sample <- sample(twitter,length(twitter)*0.01, replace = FALSE)
+blogs_sample <- sample(blogs,length(blogs)*0.01, replace = FALSE)
+#summary of the samples
+df_sample <- data.frame(file = c("news_sample","twitter_sample","blogs_sample"),lines = NA, words = NA)
+text_sample <- list(news_sample = news_sample, twitter_sample = twitter_sample, blogs_sample = blogs_sample)
+df_sample$lines <- sapply(text_sample, length)
+df_sample$words <- sapply(text_sample, words_count)
+df_sample
+```
+From the samples taken, a corpus was created and later a token. After that, the data were cleaned by removing special characters, punctuations, numbers, excess whitespace, URLs and change text into lower case. In addition, the profanity of the text needed to be removed. For doing that, a list of 451 profanity words was used which can be found here https://github.com/RobertJGabriel/Google-profanity-words/blob/master/list.txt.
+
+```{r, echo=TRUE,warning=FALSE,message=FALSE, cache= TRUE}
+library(quanteda)
+
+data_sample <- c(news_sample,twitter_sample,blogs_sample)
+#create corpus
+c <- corpus(data_sample)
+#profanity words importation
+profanityWords <- readLines("./Google-profanity-words-master/list.txt",encoding="UTF-8",skipNul = TRUE)
+#Create token and clean the data
+token <- tokens(tolower(c), remove_punct = TRUE,remove_numbers = TRUE, remove_symbols = TRUE, remove_hyphens = TRUE, remove_url = TRUE, remove_twitter = TRUE, remove_separators = TRUE)
+#remove profanity words
+token <- tokens_remove(token, profanityWords, padding = TRUE)
+```
+#Exploratory Analysis
+ The next step of the analysis was exploratory. For exploring the data about distinct words, the tokenization was used, breaking sentences and phrases to pairs of words or so called n-grams. 
+ N-gram is a contiguous sequence of n items from a given sample of text used in Natural Language Processing (NLP). They are separated into unigrams, bigrams, trigrams until n-grams, containing respectivly a single, two, three until n-word combinations.
+ From the token, 3 document-feature matrices were created, containing a summary table of all the unique tokens in the corpus and the count of times the tokens appeared. The dfms were corresponding to unigrams, bigrams and trigrams of the corpus.
+ 
+##Unigram
+```{r, echo=TRUE, warning=FALSE, message= FALSE, cache= TRUE}
+unigram <- dfm(tokens_ngrams(token,n = 1),stem = TRUE, remove = stopwords("english"))
+#top 20 unigrams
+topfeatures(unigram,20)
+barplot(topfeatures(unigram,20), ylab = "count", main = "Top 20 unigrams", col = "red", cex.names = 1)
+```
+
+##Bigram
+```{r, echo=TRUE, warning=FALSE, message= FALSE, cache= TRUE}
+bigram <- dfm(tokens_ngrams(token,n = 2, concatenator= " "), stem = TRUE, remove = stopwords("english"))
+#top 20 bigrams
+topfeatures(bigram,20)
+barplot(topfeatures(bigram,20), ylab = "count", main = "Top 20 bigrams", col = "yellow",cex.names = 0.6)
+```
+
+##Trigram
+```{r, echo=TRUE, warning=FALSE, message= FALSE, cache= TRUE}
+trigram <- dfm(tokens_ngrams(token,n = 3, concatenator= " "), stem = TRUE, remove = stopwords("english"))
+#top 20 trigrams
+topfeatures(trigram,20)
+barplot(topfeatures(trigram,20), ylab = "count", main = "Top 20 trigrams", col = "green",cex.names = 0.3)
+```
+
+#Future Steps
+
+The next setp of this capstone project will be to create a prediction model. The model will use the input text from the user, tokenize it and match the last words typed with the corpus for predicting the next word. 
+
+Afterwards, the prediction model will be integrated into a shiny application.
